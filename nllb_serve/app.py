@@ -15,22 +15,26 @@ from flask import Flask, request, send_from_directory, Blueprint
 import torch
 import transformers
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+import fasttext
 
 from . import log, DEF_MODEL_ID
 
 device = torch.device(torch.cuda.is_available() and 'cuda' or 'cpu')
 log.info(f'torch device={device}')
 
+DEF_MODEL_PATH = '/content/nllb-200-distilled-600M'
 
 #DEF_MODEL_ID = "facebook/nllb-200-distilled-600M"
-DEF_SRC_LNG = 'eng_Latn'
-DEF_TGT_LNG = 'kan_Knda'
+DEF_SRC_LNG = None
+DEF_TGT_LNG = 'eng_Latn'
 FLOAT_POINTS = 4
 exp = None
 app = Flask(__name__)
 app.config['JSON_AS_ASCII'] = False
 
 bp = Blueprint('nmt', __name__, template_folder='templates', static_folder='static')
+
+pretrained_lang_model = "/content/lid218e.bin" # Path of model filemodel = fasttext.load_model(pretrained_lang_model)
 
 
 sys_info = {
@@ -80,30 +84,32 @@ def favicon():
 
 
 def attach_translate_route(
-    model_id=DEF_MODEL_ID, def_src_lang=DEF_SRC_LNG,
+    model_id=DEF_MODEL_ID, def_src_lang=None,
     def_tgt_lang=DEF_TGT_LNG, **kwargs):
     sys_info['model_id'] = model_id
     torch.set_grad_enabled(False)
 
     log.info(f"Loading model {model_id} ...")
-    model = AutoModelForSeq2SeqLM.from_pretrained(model_id).to(device).eval()
+    model = AutoModelForSeq2SeqLM.from_pretrained(DEF_MODEL_PATH).to(device).eval()
     log.info(f"Loading default tokenizer for {model_id} ...")
-    tokenizer = AutoTokenizer.from_pretrained(model_id)
+    tokenizer = AutoTokenizer.from_pretrained(DEF_MODEL_PATH)
     src_langs = tokenizer.additional_special_tokens
     tgt_langs = src_langs
 
+    log.info(f"Loading language detection model ...")
+    lang_id_model = fasttext.load_model(pretrained_lang_model)
+
     @lru_cache(maxsize=256)
-    def get_tokenizer(src_lang=def_src_lang):
+    def get_tokenizer(src_lang):
         log.info(f"Loading tokenizer for {model_id}; src_lang={src_lang} ...")
         #tokenizer = AutoTokenizer.from_pretrained(model_id)
-        return AutoTokenizer.from_pretrained(model_id, src_lang=src_lang)
+        return AutoTokenizer.from_pretrained(DEF_MODEL_PATH, src_lang=src_lang)
 
     @bp.route('/')
     def index():
         args = dict(src_langs=src_langs, tgt_langs=tgt_langs, model_id=model_id,
-                    def_src_lang=def_src_lang, def_tgt_lang=def_tgt_lang)
+                    def_src_lang=None, def_tgt_lang=def_tgt_lang)
         return render_template('index.html', **args)
-
 
     @bp.route("/translate", methods=["POST", "GET"])
     def translate():
@@ -125,8 +131,16 @@ def attach_translate_route(
             if isinstance(sources, str):
                 sources = [sources]
 
-        src_lang = args.get('src_lang') or def_src_lang
+        src_lang = None #args.get('src_lang')
         tgt_lang = args.get('tgt_lang') or def_tgt_lang
+        log.info(src_lang)
+        if src_lang is None:
+            log.info('no src lang selected, auto detecting...')
+            lang_predictions = lang_id_model.predict("".join(sources), k=1)
+            src_lang = lang_predictions[0][0].replace('__label__', '')
+            log.info('src lang detected as ' + src_lang)
+
+
         tokenizer = get_tokenizer(src_lang=src_lang)
 
         if not sources:
@@ -171,23 +185,23 @@ def parse_args():
 
 # uwsgi can take CLI args too
 # uwsgi --http 127.0.0.1:5000 --module nllb_serve.app:app # --pyargv "--foo=bar"
-cli_args = parse_args()
-attach_translate_route(**cli_args)
-app.register_blueprint(bp, url_prefix=cli_args.get('base'))
-if cli_args.pop('debug'):
-    app.debug = True
+# cli_args = parse_args()
+attach_translate_route()
+app.register_blueprint(bp, url_prefix=None)
+# if cli_args.pop('debug'):
+app.debug = True
 
 # register a home page if needed
-if cli_args.get('base'):
-    @app.route('/')
-    def home():
-        return render_template('home.html', demo_url=cli_args.get('base'))
+# if cli_args.get('base'):
+#     @app.route('/')
+#     def home():
+#         return render_template('home.html', demo_url=cli_args.get('base'))
 
 
 def main():
     log.info(f"System Info: ${sys_info}")
     # CORS(app)  # TODO: insecure
-    app.run(port=cli_args["port"], host=cli_args["host"])
+    app.run(port=5001, host="0.0.0.0")
     # A very useful tutorial is found at:
     # https://www.digitalocean.com/community/tutorials/how-to-make-a-web-application-using-flask-in-python-3
 

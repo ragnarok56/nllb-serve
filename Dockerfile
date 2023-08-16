@@ -1,5 +1,7 @@
 FROM python:3.8.14-slim-buster
 
+RUN apt-get update && apt-get install build-essential -y
+
 WORKDIR /app
 
 RUN pip3 install --upgrade pip

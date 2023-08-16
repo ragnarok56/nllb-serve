@@ -96,7 +96,7 @@ $ curl -H "Content-Type: application/json" -X POST \
    --data '{"source": ["Comment allez-vous?"], "src_lang": "fra_Latn", "tgt_lang": "kan_Knda"}'
 ```
 
-List of language codes: https://huggingface.co/facebook/nllb-200-distilled-600M/blob/main/special_tokens_map.json 
+List of language codes: https://huggingface.co/facebook/nllb-200-distilled-600M/blob/main/special_tokens_map.json
 
 ## NLLB-Batch
 
@@ -127,8 +127,8 @@ options:
 
 ## License
 
-The code and model weights carry different licenses. 
-The code in this repository is distributed via [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0.html).  
+The code and model weights carry different licenses.
+The code in this repository is distributed via [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0.html).
 But the model weights are accessed from Huggingface Hub and the original license of model weigts are applicable.
 At the time of writing, authors of NLLB model distributed weights via CC-BY-NC-4.0 license. Read more at [LICENSE.model.md](https://github.com/facebookresearch/fairseq/blob/nllb/LICENSE.model.md) and [Creative Commons License](https://en.wikipedia.org/wiki/Creative_Commons_license)
 
@@ -139,3 +139,20 @@ At the time of writing, authors of NLLB model distributed weights via CC-BY-NC-4
 * https://huggingface.co/docs/transformers/main/en/model_doc/nllb
 * https://ai.facebook.com/research/no-language-left-behind/
 * https://github.com/facebookresearch/fairseq/tree/nllb/
+
+
+
+# Get models locally
+dumps models in content directory, which gets mapped to container as a volume
+```
+sudo yum install git-lfs
+mkdir -p content
+cd content
+git clone https://huggingface.co/facebook/nllb-200-distilled-600M
+wget https://dl.fbaipublicfiles.com/nllb/lid/lid218e.bin
+```
+
+# Run container
+```
+docker compose up
+```

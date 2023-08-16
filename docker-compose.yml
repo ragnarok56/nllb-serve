@@ -9,6 +9,7 @@ services:
       - 5001:5001
     volumes:
       - ./nllb_serve:/app/nllb_serve
+      - ./content:/content
     entrypoint: [ "gunicorn" ]
     command:
       [
@@ -18,7 +19,7 @@ services:
         "-k",
         "gevent",
         "-w",
-        "4",
+        "2",
         "--threads",
         "8",
         "--timeout",
